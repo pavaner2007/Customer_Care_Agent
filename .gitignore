@@ -1,0 +1,45 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+web_components/
+
+# Python virtual environment
+python-ml-service/venv/
+python-ml-service/.venv/
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Local databases and fallback files
+backend/tickets.json
+tickets.json
+backend/admins.json
+admins.json
+
+# Environment variables and secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+frontend/.env
+python-ml-service/.env
+
+# Production build directories
+dist/
+build/
+out/
+.next/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# System files
+.DS_Store
+Thumbs.db

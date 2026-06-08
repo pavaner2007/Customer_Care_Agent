@@ -1,0 +1,12 @@
+{
+  "name": "caremind-ai",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "install:python": "cd python-ml-service && python -m pip install -r requirements.txt",
+    "dev": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:full": "concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\" \"cd python-ml-service && .\\\\venv\\\\Scripts\\\\uvicorn app.main:app --reload --port 8000\""
+  },
+  "devDependencies": { "concurrently": "^9.1.0" }
+}
