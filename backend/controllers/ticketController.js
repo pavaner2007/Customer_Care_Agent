@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import Ticket from '../models/Ticket.js';
 import { analyzeComplaint, generateReply } from '../services/groqService.js';
 import { predictComplaintRisk, getMlInsights } from '../services/mlService.js';
+import { sendCriticalAlert } from '../services/notificationService.js';
 
 // --- Local JSON DB Fallback for High Resilience ---
 let localTickets = [];
@@ -69,6 +70,10 @@ export const createTicket = async (req, res) => {
       localTickets.unshift(ticket);
       saveLocalTickets();
     }
+    
+    // Trigger critical alert notifications in background (fire-and-forget)
+    sendCriticalAlert(ticket).catch(err => console.error('Alert sending failed:', err.message));
+
     res.status(201).json(ticket);
   } catch (error) {
     res.status(500).json({ message: 'Failed to create ticket', error: error.message });
