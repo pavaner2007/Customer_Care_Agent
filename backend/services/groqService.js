@@ -15,7 +15,9 @@ const fallbackAnalysis = (message) => {
     riskScore: angry ? 86 : 48,
     summary: message.length > 120 ? `${message.slice(0, 117)}...` : message,
     suggestedReply: 'We sincerely apologize for the inconvenience. Your concern has been prioritized and our team will resolve it as quickly as possible.',
-    recommendedAction: angry ? 'Escalate to senior support manager and offer compensation if valid.' : 'Assign to support agent and update customer within 24 hours.'
+    recommendedAction: angry ? 'Escalate to senior support manager and offer compensation if valid.' : 'Assign to support agent and update customer within 24 hours.',
+    detectedLanguage: 'English',
+    translatedMessage: message
   };
 };
 
@@ -31,7 +33,14 @@ export const analyzeComplaint = async ({ customerName, message }) => {
     return fallbackAnalysis(message);
   }
 
-  const prompt = `You are CareMind AI, a customer retention intelligence engine. Analyze this customer complaint and return ONLY valid JSON with these exact keys: sentiment, category, priority, churnRisk, riskScore, summary, suggestedReply, recommendedAction. Use sentiment as Positive, Neutral, Frustrated, or Angry. Use category as Refund, Delivery, Product, Payment, Service, Technical, or General. Use priority and churnRisk as Low, Medium, or High. riskScore must be a number from 0 to 100. Customer name: ${customerName}. Complaint: ${message}`;
+  const prompt = `You are CareMind AI, a customer retention intelligence engine. Analyze this customer complaint and return ONLY valid JSON with these exact keys: sentiment, category, priority, churnRisk, riskScore, summary, suggestedReply, recommendedAction, detectedLanguage, translatedMessage.
+
+Use sentiment as Positive, Neutral, Frustrated, or Angry. Use category as Refund, Delivery, Product, Payment, Service, Technical, or General. Use priority and churnRisk as Low, Medium, or High. riskScore must be a number from 0 to 100.
+detectedLanguage must be the detected language (e.g. 'English', 'Hindi', 'Spanish', 'French', etc.).
+translatedMessage must be the English translation of the customer's complaint ONLY if the complaint is not in English. If it is in English, keep it as the original message.
+suggestedReply must be written in the SAME language as the original customer's complaint (e.g., if complaint is in Hindi, suggestedReply must be in Hindi; if in Spanish, suggestedReply must be in Spanish).
+summary must be a 1-sentence summary of the issue in English.
+Customer name: ${customerName}. Complaint: ${message}`;
 
   try {
     const response = await axios.post(

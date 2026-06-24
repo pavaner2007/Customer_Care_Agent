@@ -19,6 +19,10 @@ const ticketSchema = new mongoose.Schema(
     escalationReason: { type: String, default: '' },
     modelVersion: { type: String, default: '' },
     aiEngine: { type: String, default: 'Groq LLM' },
+    detectedLanguage: { type: String, default: 'English' },
+    translatedMessage: { type: String, default: '' },
+    csatRating: { type: Number, default: null },
+    csatFeedback: { type: String, default: '' },
     status: { type: String, enum: ['Open', 'In Progress', 'Resolved'], default: 'Open' }
   },
   { timestamps: true }

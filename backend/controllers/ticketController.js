@@ -173,3 +173,43 @@ export const refreshReply = async (req, res) => {
   }
 };
 
+export const submitCsat = async (req, res) => {
+  try {
+    const { csatRating, csatFeedback } = req.body;
+    const { id } = req.params;
+
+    if (csatRating === undefined || csatRating < 1 || csatRating > 5) {
+      return res.status(400).json({ message: 'csatRating must be a number between 1 and 5' });
+    }
+
+    let ticket;
+    if (mongoose.connection.readyState === 1) {
+      ticket = await Ticket.findByIdAndUpdate(
+        id,
+        { csatRating, csatFeedback: csatFeedback || '' },
+        { new: true }
+      );
+    } else {
+      const idx = localTickets.findIndex(t => t._id === id);
+      if (idx !== -1) {
+        localTickets[idx] = {
+          ...localTickets[idx],
+          csatRating,
+          csatFeedback: csatFeedback || '',
+          updatedAt: new Date().toISOString()
+        };
+        ticket = localTickets[idx];
+        saveLocalTickets();
+      }
+    }
+
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    res.json({ message: 'CSAT rating submitted successfully', ticket });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to submit CSAT', error: error.message });
+  }
+};
+

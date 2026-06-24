@@ -4,6 +4,7 @@ import path from 'path';
 import mongoose from 'mongoose';
 import Ticket from '../models/Ticket.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { getMlInsights } from '../services/mlService.js';
 
 const router = express.Router();
 const ticketsFile = path.resolve('tickets.json');
@@ -32,20 +33,44 @@ router.get('/summary', protect, async (req, res) => {
     const openTickets = tickets.filter(t => t.status === 'Open').length;
     const resolvedTickets = tickets.filter(t => t.status === 'Resolved').length;
     const escalatedTickets = tickets.filter(t => t.escalationRequired).length;
-    const escalatedTicketsReal = tickets.filter(t => t.status !== 'Resolved' && t.escalationRequired).length;
-    // We will follow the format specified by the user
     const highPriorityTickets = tickets.filter(t => t.priority === 'High').length;
     const averageRiskScore = totalTickets
       ? Math.round(tickets.reduce((sum, t) => sum + (t.riskScore || 0), 0) / totalTickets)
       : 0;
 
+    // CSAT Calculations
+    const ratedTickets = tickets.filter(t => t.csatRating !== undefined && t.csatRating !== null);
+    const averageCsat = ratedTickets.length
+      ? Number((ratedTickets.reduce((sum, t) => sum + t.csatRating, 0) / ratedTickets.length).toFixed(1))
+      : 0;
+
+    let csat1 = 0, csat2 = 0, csat3 = 0, csat4 = 0, csat5 = 0;
+    ratedTickets.forEach(t => {
+      const r = Math.round(t.csatRating);
+      if (r === 1) csat1++;
+      else if (r === 2) csat2++;
+      else if (r === 3) csat3++;
+      else if (r === 4) csat4++;
+      else if (r === 5) csat5++;
+    });
+
+    const csatDistribution = [
+      { name: '1 Star', value: csat1 },
+      { name: '2 Stars', value: csat2 },
+      { name: '3 Stars', value: csat3 },
+      { name: '4 Stars', value: csat4 },
+      { name: '5 Stars', value: csat5 }
+    ];
+
     // 1. Sentiment Distribution
+    // Groq returns: Positive, Neutral, Frustrated, Angry
+    // Normalize Frustrated/Angry → Negative for the pie chart
     let posCount = 0, neuCount = 0, negCount = 0;
     tickets.forEach(t => {
-      const sentiment = t.sentiment || 'Neutral';
+      const sentiment = (t.sentiment || 'Neutral');
       if (sentiment === 'Positive') posCount++;
       else if (sentiment === 'Neutral') neuCount++;
-      else negCount++; // Frustrated or Angry
+      else negCount++; // Angry or Frustrated → Negative
     });
     const sentimentDistribution = [
       { name: 'Positive', value: posCount },
@@ -109,6 +134,9 @@ router.get('/summary', protect, async (req, res) => {
       tickets: d.tickets
     }));
 
+    // ML Insights from Python service
+    const mlInsights = await getMlInsights(tickets);
+
     res.json({
       totalTickets,
       openTickets,
@@ -120,7 +148,10 @@ router.get('/summary', protect, async (req, res) => {
       categoryDistribution,
       priorityDistribution,
       dailyTickets,
-      churnRiskDistribution
+      churnRiskDistribution,
+      averageCsat,
+      csatDistribution,
+      mlInsights: mlInsights || null
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to load analytics summary', error: error.message });
