@@ -23,6 +23,8 @@ const ticketSchema = new mongoose.Schema(
     translatedMessage: { type: String, default: '' },
     csatRating: { type: Number, default: null },
     csatFeedback: { type: String, default: '' },
+    lastResponseSentAt: { type: Date, default: null },
+    responseStatus: { type: String, default: '' },
     status: { type: String, enum: ['Open', 'In Progress', 'Resolved'], default: 'Open' }
   },
   { timestamps: true }

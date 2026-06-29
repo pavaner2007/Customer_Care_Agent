@@ -36,6 +36,14 @@ const generateToken = (id) => {
 
 export const register = async (req, res) => {
   try {
+    if (process.env.DISABLE_ADMIN_REGISTER === "true") {
+      return res.status(403).json({ message: "Admin registration is disabled" });
+    }
+
+    if (req.headers["x-setup-secret"] !== process.env.ADMIN_SETUP_SECRET) {
+      return res.status(403).json({ message: "Invalid setup secret" });
+    }
+
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {

@@ -242,7 +242,7 @@ function Home() {
       }
     } else if (currentStep === 'csat') {
       if (ticketId) {
-        api.patch(`/tickets/${ticketId}`, { csatFeedback: raw }).catch(e => console.error(e));
+        api.patch(`/tickets/${ticketId}/csat`, { csatFeedback: raw }).catch(e => console.error(e));
       }
       setStepSynced('ended');
       addBotMsg("Thank you for your valuable feedback! 😊 Have a wonderful day! 🌟");
@@ -898,6 +898,7 @@ function Dashboard() {
   // Real-time alerts, polling, and email response states
   const [modalReply, setModalReply] = useState('');
   const [emailSent, setEmailSent] = useState(false);
+  const [emailSentText, setEmailSentText] = useState('');
   const [sendLoading, setSendLoading] = useState(false);
   const [toasts, setToasts] = useState([]);
   const ticketIdsRef = useRef(new Set());
@@ -973,6 +974,7 @@ function Dashboard() {
     if (selectedTicket) {
       setModalReply(selectedTicket.suggestedReply || '');
       setEmailSent(false);
+      setEmailSentText('');
     }
   }, [selectedTicket]);
 
@@ -1407,15 +1409,19 @@ CareMind Support Team`
                 <div className="flex justify-between items-center border-t border-white/5 pt-3">
                   {emailSent ? (
                     <span className="text-xs text-emerald-400 font-bold flex items-center gap-1.5 animate-fadeIn">
-                      <CheckCircle2 size={14} /> Response email dispatched to customer successfully!
+                      <CheckCircle2 size={14} /> {emailSentText}
                     </span>
                   ) : (
                     <button
                       onClick={async () => {
                         setSendLoading(true);
                         try {
-                          await new Promise(r => setTimeout(r, 1200));
-                          await api.patch(`/tickets/${selectedTicket._id}`, { suggestedReply: modalReply, status: 'In Progress' });
+                          const res = await api.post(`/tickets/${selectedTicket._id}/send-response`, { message: modalReply });
+                          if (res.data.responseStatus === 'sent') {
+                            setEmailSentText("Response sent successfully");
+                          } else {
+                            setEmailSentText("Response saved in demo mode");
+                          }
                           setEmailSent(true);
                           loadDashboardData();
                         } catch (err) {
@@ -1523,7 +1529,7 @@ function App() {
           <Route path="/" element={<Home />} />
           
           {/* Admin gate login page */}
-          <Route path="/admin-login" element={<Navigate to="/?portal=admin" replace />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
           
           {/* Protected admin dashboard */}
           <Route 

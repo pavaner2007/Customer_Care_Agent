@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import mongoose from 'mongoose';
+import nodemailer from 'nodemailer';
 import Ticket from '../models/Ticket.js';
 import { analyzeComplaint, generateReply } from '../services/groqService.js';
 import { predictComplaintRisk, getMlInsights } from '../services/mlService.js';
@@ -178,15 +179,29 @@ export const submitCsat = async (req, res) => {
     const { csatRating, csatFeedback } = req.body;
     const { id } = req.params;
 
-    if (csatRating === undefined || csatRating < 1 || csatRating > 5) {
-      return res.status(400).json({ message: 'csatRating must be a number between 1 and 5' });
+    if (csatRating === undefined && csatFeedback === undefined) {
+      return res.status(400).json({ message: 'Either csatRating or csatFeedback must be provided' });
+    }
+
+    const updateFields = {};
+
+    if (csatRating !== undefined) {
+      const ratingNum = Number(csatRating);
+      if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+        return res.status(400).json({ message: 'csatRating must be a number between 1 and 5' });
+      }
+      updateFields.csatRating = ratingNum;
+    }
+
+    if (csatFeedback !== undefined) {
+      updateFields.csatFeedback = csatFeedback;
     }
 
     let ticket;
     if (mongoose.connection.readyState === 1) {
       ticket = await Ticket.findByIdAndUpdate(
         id,
-        { csatRating, csatFeedback: csatFeedback || '' },
+        updateFields,
         { new: true }
       );
     } else {
@@ -194,8 +209,7 @@ export const submitCsat = async (req, res) => {
       if (idx !== -1) {
         localTickets[idx] = {
           ...localTickets[idx],
-          csatRating,
-          csatFeedback: csatFeedback || '',
+          ...updateFields,
           updatedAt: new Date().toISOString()
         };
         ticket = localTickets[idx];
@@ -207,9 +221,101 @@ export const submitCsat = async (req, res) => {
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    res.json({ message: 'CSAT rating submitted successfully', ticket });
+    res.json({ message: 'CSAT submitted successfully', ticket });
   } catch (error) {
     res.status(500).json({ message: 'Failed to submit CSAT', error: error.message });
+  }
+};
+
+export const sendResponseEmail = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ message: 'Message is required' });
+    }
+
+    let ticket;
+    if (mongoose.connection.readyState === 1) {
+      ticket = await Ticket.findById(id);
+    } else {
+      ticket = localTickets.find(t => t._id === id);
+    }
+
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    const customerEmail = ticket.email;
+    const hasSmtp = process.env.SMTP_HOST && 
+                    process.env.SMTP_USER && 
+                    process.env.SMTP_PASS && 
+                    !process.env.SMTP_USER.includes('your_email') &&
+                    !process.env.SMTP_USER.includes('your_smtp_user');
+
+    let responseStatus = 'mock_sent';
+    let emailDetails = 'Response saved in demo mode because SMTP is not configured.';
+
+    if (hasSmtp) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: Number(process.env.SMTP_PORT) || 587,
+          secure: Number(process.env.SMTP_PORT) === 465,
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+        });
+
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || `"CareMind AI" <${process.env.SMTP_USER}>`,
+          to: customerEmail,
+          subject: `Re: CareMind AI Ticket ID #${ticket._id.toString().slice(-6).toUpperCase()}`,
+          text: message,
+        });
+        responseStatus = 'sent';
+        emailDetails = 'Response sent successfully via email.';
+      } catch (error) {
+        console.error('Nodemailer failed:', error.message);
+        responseStatus = 'failed';
+        emailDetails = `Failed to send email: ${error.message}. Response saved.`;
+      }
+    }
+
+    const newStatus = ticket.status === 'Resolved' ? 'Resolved' : 'In Progress';
+
+    if (mongoose.connection.readyState === 1) {
+      ticket.suggestedReply = message;
+      ticket.lastResponseSentAt = new Date();
+      ticket.responseStatus = responseStatus;
+      ticket.status = newStatus;
+      await ticket.save();
+    } else {
+      const idx = localTickets.findIndex(t => t._id === id);
+      if (idx !== -1) {
+        localTickets[idx] = {
+          ...localTickets[idx],
+          suggestedReply: message,
+          lastResponseSentAt: new Date().toISOString(),
+          responseStatus,
+          status: newStatus,
+          updatedAt: new Date().toISOString()
+        };
+        ticket = localTickets[idx];
+        saveLocalTickets();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: emailDetails,
+      responseStatus,
+      ticket
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to send response', error: error.message });
   }
 };
 

@@ -27,9 +27,28 @@ const getTickets = async () => {
 router.get('/summary', protect, async (req, res) => {
   try {
     const tickets = await getTickets();
+    const totalTickets = tickets.length;
+
+    if (totalTickets === 0) {
+      return res.json({
+        totalTickets: 0,
+        openTickets: 0,
+        resolvedTickets: 0,
+        escalatedTickets: 0,
+        highPriorityTickets: 0,
+        averageRiskScore: 0,
+        sentimentDistribution: [],
+        categoryDistribution: [],
+        priorityDistribution: [],
+        dailyTickets: [],
+        churnRiskDistribution: [],
+        averageCsat: 0,
+        csatDistribution: [],
+        mlInsights: null
+      });
+    }
     
     // Basic stats
-    const totalTickets = tickets.length;
     const openTickets = tickets.filter(t => t.status === 'Open').length;
     const resolvedTickets = tickets.filter(t => t.status === 'Resolved').length;
     const escalatedTickets = tickets.filter(t => t.escalationRequired).length;
